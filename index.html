@@ -16,6 +16,8 @@
     2. 「応用力」を独立次元として追加し、結果は5次元表示にした（案B）。タイプ判定の2軸には試作期は算入しない（検証力と同じ扱い）。
     3. 全設問に「わからない」の選択肢を追加した。選んだ設問は0点ではなく「未挑戦」として記録し、スコア計算の分母から外す。
     4. 結果コードをバージョン2に上げた（5次元化。詳細は結果コードのコメント参照）。
+    5. パイロット版限定で、設問ごとの一言メモ欄と、結果画面での「結果コード＋メモ」まとめコピーを追加した。
+       メモは端末内だけに保持し、採点・結果コードには含めない（2026-11-26夜、りな裁定）。
 -->
 <style>
   :root{
@@ -48,6 +50,10 @@
   .note{font-size:.88rem; color:var(--ink-sub);}
   details{margin-top:26px; border-top:1px solid var(--line); padding-top:14px;}
   details summary{font-weight:700; font-size:1.05rem; cursor:pointer;}
+  /* パイロット版限定：設問ごとの一言メモ欄（折りたたみ・初期は閉） */
+  details.pilot-memo{margin-top:18px; border-top:none; padding-top:0;}
+  details.pilot-memo summary{font-size:.92rem; font-weight:400; color:var(--ink-sub);}
+  details.pilot-memo textarea{min-height:56px; margin-top:8px;}
   .screen{display:none;}
   .screen.active{display:block;}
   /* 選択肢（ラジオ風ボタン） */
@@ -454,6 +460,12 @@
   <div class="nav"><a class="btn" href="https://docs.google.com/forms/d/e/1FAIpQLSeekhG8fcd8pHd8vsFVb_y8s0sf9fsOVRT_1XR_UQ417fLNpA/viewform" target="_blank" rel="noopener">結果コードと感想を送る（試作へのご協力）</a></div>
   <p class="note">送り先はGoogleフォームです。結果コードと任意の感想だけを集めます。氏名・メールアドレスは集めません。</p>
 
+  <h2>コードとメモをまとめて送る（パイロット版）</h2>
+  <p class="note">コードとメモをまとめてコピーして、フォームに貼り付けてください。</p>
+  <textarea id="combined-copy" rows="6" readonly></textarea>
+  <div class="nav"><button class="btn" id="btn-copy-combined">コードとメモをまとめてコピーする</button></div>
+  <p class="note" id="combined-note"></p>
+
   <h2>詳細レポート（有料）</h2>
   <p>あなたの回答に沿って解説するレポートを用意しています。判定と危なさの指摘は無料のままです。レポートでは、その理由と対策を説明します。</p>
   <p>詳細レポート（¥100・税込）：6つの節で、あなたの点数と回答をもとに解説します。<br>
@@ -465,6 +477,12 @@
   <h2>戻りたかった所（任意）</h2>
   <p class="note">このテストは前の画面に戻れません。途中で「戻りたかった」と思った所があれば、今後の改修の材料にします。ここに書いた内容は送信されません。よければ、上のフォームの感想欄に写して送ってください。</p>
   <textarea id="wentback-note" rows="3" placeholder="例：第2部の途中で、前の問題を確かめたくなった"></textarea>
+
+  <div id="result-memos-block">
+    <h2>設問ごとの一言メモ（パイロット版）</h2>
+    <div id="result-memos"></div>
+    <p class="note">このメモは自動では送信されません。お手数ですが、フォームの感想欄に貼り付けてください。</p>
+  </div>
 
   <p class="note">このテストは、IQや知能を測る検査ではありません。結果は自己理解のための目安としてご覧ください。結果コードのチェックサムは入力ミスの検出用で、証明書としての効力はありません。</p>
 </section>
@@ -500,7 +518,8 @@ const state = {
     c2Fix: undefined,           /* 修正の回答（"unknown"＝わからない） */
     c3Output: "", c3Skip: false,
     c3q: undefined, c3qSkip: false
-  }
+  },
+  memos: {}   /* パイロット版限定：設問ごとの一言メモ（キー→文字列）。採点・結果コードには含めない */
 };
 
 /* --- 構造化思考 問1（分解） ---
@@ -749,6 +768,79 @@ function copyText(text, noteId, okMsg) {
     navigator.clipboard.writeText(text).then(function () { note.textContent = okMsg; }, fallback);
   } else { fallback(); }
 }
+
+/* ================= パイロット版限定：設問ごとの一言メモ =================
+   各設問・素材の画面に任意の一言メモ欄（折りたたみ）を置き、結果画面で一覧表示と
+   「結果コード＋メモ」のまとめコピーを提供する。採点・結果コードには一切含めない。 */
+const MEMO_DEFS = [
+  { screen: "scr-struct1", key: "struct1" },
+  { screen: "scr-struct2", key: "struct2" },
+  { screen: "scr-a-detect", key: null },   /* キーは段階ごとに切替（a1〜a3） */
+  { screen: "scr-a-fix",    key: null },   /* 検出画面と同じ段階のメモを共有する */
+  { screen: "scr-b", key: "b" },
+  { screen: "scr-c1", key: "c1" },
+  { screen: "scr-c1b", key: "c1b" },
+  { screen: "scr-c2", key: "c2" },
+  { screen: "scr-c2mark", key: "c2mark" },
+  { screen: "scr-c2fix", key: "c2fix" },
+  { screen: "scr-c3", key: "c3" },
+  { screen: "scr-c3q", key: "c3q" }
+];
+const MEMO_ORDER = [   /* 結果画面での表示順と画面名 */
+  ["struct1", "第1部 構造化思考（問1）"],
+  ["struct2", "第1部 構造化思考（問2）"],
+  ["a1", "第2部 実演A（段階1）"],
+  ["a2", "第2部 実演A（段階2）"],
+  ["a3", "第2部 実演A（段階3）"],
+  ["b", "第2部 実演B"],
+  ["c1", "第3部 実演C（C-1 指示を出す）"],
+  ["c1b", "第3部 実演C（C-1 要素選び）"],
+  ["c2", "第3部 実演C（C-2 課題文の受け渡し）"],
+  ["c2mark", "第3部 実演C（C-2 印付け）"],
+  ["c2fix", "第3部 実演C（C-2 直し方）"],
+  ["c3", "第3部 実演C（C-3 立て直し）"],
+  ["c3q", "第3部 実演C（C-3 再指示の選び方）"]
+];
+const memoTextareas = {};   /* 画面ID→メモ欄のtextarea */
+(function buildMemoFields() {
+  MEMO_DEFS.forEach(function (def) {
+    const sec = document.getElementById(def.screen);
+    if (!sec) return;
+    const det = document.createElement("details");
+    det.className = "pilot-memo";
+    const sum = document.createElement("summary");
+    sum.textContent = "質問や答えに疑問があれば、ここに一言（任意・パイロット版のみ）";
+    const ta = document.createElement("textarea");
+    ta.rows = 2;
+    ta.placeholder = "例：この質問の聞き方が分かりにくかった";
+    if (def.key) { ta.setAttribute("data-memo-key", def.key); ta.value = state.memos[def.key] || ""; }
+    ta.addEventListener("input", function () {
+      const k = ta.getAttribute("data-memo-key");
+      if (k) state.memos[k] = ta.value;
+    });
+    det.appendChild(sum); det.appendChild(ta);
+    const nav = sec.querySelector(".nav");
+    if (nav) sec.insertBefore(det, nav); else sec.appendChild(det);
+    memoTextareas[def.screen] = ta;
+  });
+})();
+function syncStageMemo(stage) { /* 実演A：検出・直し方の両画面のメモ欄を、その段階のキーと保持内容に合わせる */
+  const key = "a" + stage;
+  ["scr-a-detect", "scr-a-fix"].forEach(function (sid) {
+    const ta = memoTextareas[sid];
+    if (!ta) return;
+    ta.setAttribute("data-memo-key", key);
+    ta.value = state.memos[key] || "";
+  });
+}
+function collectMemos() { /* 空でないメモを、画面の並び順に [画面名, 内容] で返す */
+  const out = [];
+  MEMO_ORDER.forEach(function (pair) {
+    const v = (state.memos[pair[0]] || "").trim();
+    if (v) out.push([pair[1], v]);
+  });
+  return out;
+}
 /* 実演Cの対象者か（AIを使っていて、このテストにも使う人だけが対象。それ以外は既存分岐に合流） */
 function cApplicable() { return state.q1 === "yes" && state.q2 === "yes"; }
 
@@ -837,6 +929,7 @@ document.getElementById("btn-struct2-unknown").addEventListener("click", functio
 let currentStage = 1;
 function startAStage(stage) {
   currentStage = stage;
+  syncStageMemo(stage);
   const def = A_STAGES[stage];
   document.getElementById("a-detect-progress").textContent = def.progress;
   document.getElementById("a-detect-title").textContent = def.title;
@@ -896,6 +989,7 @@ document.getElementById("btn-a-detect-next").addEventListener("click", function 
     body.appendChild(ul);
   });
   body.setAttribute("data-fixable", fixable.join(","));
+  syncStageMemo(stage);   /* 直し方画面のメモ欄に、検出画面で書いた内容を反映する */
   show("scr-a-fix");
 });
 document.getElementById("btn-a-detect-unknown").addEventListener("click", function () {
@@ -1540,8 +1634,37 @@ function renderResult() {
 
   document.getElementById("result-code").textContent = makeResultCode(r, typeId, trap);
   document.getElementById("copy-note").textContent = "";
+  document.getElementById("combined-note").textContent = "";
+  renderMemoBlocks();
   show("scr-result");
 }
+function renderMemoBlocks() { /* 設問ごとの一言メモの一覧表示と、まとめコピー欄の組み立て */
+  const list = collectMemos();
+  const block = document.getElementById("result-memos-block");
+  const box = document.getElementById("result-memos");
+  box.innerHTML = "";
+  if (list.length === 0) { block.style.display = "none"; }
+  else {
+    block.style.display = "";
+    list.forEach(function (pair) {
+      const p = document.createElement("p");
+      p.textContent = pair[0] + "：" + pair[1];
+      box.appendChild(p);
+    });
+  }
+  updateCombined();
+}
+function updateCombined() { /* 1行目＝結果コード、続いて設問メモの一覧、末尾に「戻りたかった所」（入力がある場合） */
+  const lines = [document.getElementById("result-code").textContent];
+  collectMemos().forEach(function (pair) { lines.push(pair[0] + "：" + pair[1]); });
+  const wb = document.getElementById("wentback-note").value.trim();
+  if (wb) lines.push("戻りたかった所：" + wb);
+  document.getElementById("combined-copy").value = lines.join("\n");
+}
+document.getElementById("wentback-note").addEventListener("input", updateCombined);
+document.getElementById("btn-copy-combined").addEventListener("click", function () {
+  copyText(document.getElementById("combined-copy").value, "combined-note", "コピーしました。フォームに貼り付けてください。");
+});
 document.getElementById("btn-copy-code").addEventListener("click", function () {
   copyText(document.getElementById("result-code").textContent, "copy-note", "コピーしました。");
 });
