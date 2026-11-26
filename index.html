@@ -46,6 +46,8 @@
   h2{font-size:1.1rem; margin:26px 0 8px; padding-left:8px; border-left:4px solid var(--accent);}
   p{margin:10px 0;}
   .note{font-size:.88rem; color:var(--ink-sub);}
+  details{margin-top:26px; border-top:1px solid var(--line); padding-top:14px;}
+  details summary{font-weight:700; font-size:1.05rem; cursor:pointer;}
   .screen{display:none;}
   .screen.active{display:block;}
   /* 選択肢（ラジオ風ボタン） */
@@ -167,12 +169,14 @@
   <p><strong>第3部では、あなたが普段使っているAIを、別のタブ・別のアプリ・別の端末で開いて使います。AIを使っていない方・このテストにAIを使わない方は、第3部は対象外になります。</strong></p>
   <p>各設問には「わからない」という選択肢があります。分からないときは、無理に答えず「わからない」を選んでください。「わからない」を選んだ設問は0点にはならず、「未挑戦」として記録されます。</p>
   <p class="note">このテストは、IQや知能を測る検査ではありません。結果は自己理解のための目安です。</p>
-  <h2>結果コードを読み込む</h2>
-  <p>前に受けたときの結果コードを貼ると、そのときの記録を表示します。再び受けたときの記録と見比べるのに使えます。</p>
-  <textarea id="decode-input" rows="3" placeholder="結果コードをここに貼ってください"></textarea>
-  <p><button class="btn sub" id="btn-decode" type="button">読み込む</button></p>
-  <div id="decode-result"></div>
   <div class="nav"><button class="btn" id="btn-start">始める</button></div>
+  <details>
+    <summary>結果コードを読み込む</summary>
+    <p>前に受けたときの結果コードを貼ると、そのときの記録を表示します。再び受けたときの記録と見比べるのに使えます。</p>
+    <textarea id="decode-input" rows="3" placeholder="結果コードをここに貼ってください"></textarea>
+    <p><button class="btn sub" id="btn-decode" type="button">読み込む</button></p>
+    <div id="decode-result"></div>
+  </details>
 </section>
 
 <!-- ============ 画面1：問診 ============ -->
