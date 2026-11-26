@@ -18,6 +18,10 @@
     4. 結果コードをバージョン2に上げた（5次元化。詳細は結果コードのコメント参照）。
     5. パイロット版限定で、設問ごとの一言メモ欄と、結果画面での「結果コード＋メモ」まとめコピーを追加した。
        メモは端末内だけに保持し、採点・結果コードには含めない（2026-11-26夜、りな裁定）。
+    6. 結果画面の「詳細レポート（有料）」節に、本人のデータ（タイプ・5次元・段階別・見逃し・罠反応）から
+       その場で組み立てる「詳細レポートの冒頭プレビュー」を追加した（2026-11-26夜、りな裁定）。
+       プレビューはレポート第1節（結果の読み方）相当までとし、対策（第4節）と指示の型（第5節）は含めない。
+       固定文の使い回しはせず、採点・結果コードにも含めない。
 -->
 <style>
   :root{
@@ -143,6 +147,10 @@
   table.scores td.num{font-size:1.15rem; font-weight:700;}
   .warnbox{border:1px solid #d8c98a; background:var(--warn-bg); padding:12px 16px; margin:14px 0;}
   .warnbox p{margin:6px 0;}
+  /* 詳細レポートの冒頭プレビュー（結果画面・有料節） */
+  .preview-title{font-size:1rem; margin:22px 0 0;}
+  .previewbox{border:1px solid var(--accent); background:var(--accent-bg); padding:12px 16px; margin:10px 0 14px;}
+  .previewbox p{margin:6px 0;}
   .codebox{
     font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; word-break:break-all;
     border:1px solid var(--line); background:var(--bg-sub); padding:14px; font-size:1rem; letter-spacing:.06em; margin:10px 0;
@@ -470,6 +478,8 @@
   <p>あなたの回答に沿って解説するレポートを用意しています。判定と危なさの指摘は無料のままです。レポートでは、その理由と対策を説明します。</p>
   <p>詳細レポート（¥100・税込）：6つの節で、あなたの点数と回答をもとに解説します。<br>
   より詳細レポート（¥999・税込）：10の節で、より深く分析します。受注生産のため、お渡しまで5営業日以内をいただきます。</p>
+  <h3 class="preview-title">あなたの詳細レポート（冒頭）</h3>
+  <div class="previewbox" id="report-preview"></div>
   <div class="nav"><a class="btn" href="https://buy.stripe.com/8x2bJ0aqq2Fd1U52KTcEw00" target="_blank" rel="noopener">詳細レポート ¥100 を購入する</a></div>
   <div class="nav"><a class="btn secondary" href="https://buy.stripe.com/3cIaEWeGGbbJcyJgBJcEw01" target="_blank" rel="noopener">より詳細レポート ¥999 を購入する</a></div>
   <p class="note">購入の画面で、結果コードの入力が必要です。レポートは、入力された結果コードをもとに作成し、順次お渡しします。販売条件は<a href="tokushoho.html">特定商取引法に基づく表記</a>をご覧ください。</p>
@@ -1530,6 +1540,122 @@ function unknownLabels() { /* 「わからない」を選んだ設問の一覧�
   }
   return u;
 }
+/* ================= 詳細レポートの冒頭プレビュー =================
+   結果画面の「詳細レポート（有料）」節で、本人のデータからその場で組み立てる冒頭文。
+   範囲はレポート第1節（結果の読み方）相当まで＋本人が触れた項目への指摘1つ。
+   対策（第4節）と指示の型（第5節）は含めない。採点・結果コードには一切関与しない。
+   落ち方の型は、型v0 §2 軸5の6型（＋v0.1パッチの「全体低位（保留型）」）を、画面内の実データから決定的に判定する。
+   数値次元が3未満しか測れていない分岐では、型を名乗らず、言える範囲だけを書く。 */
+function buildReportPreview(r, type, trap, bRes, s1, s2, s3, unknownCount) {
+  const lines = [];
+  const dims = [
+    ["構造化思考", r.struct], ["実演A", r.a], ["実演B", r.b], ["検証力", r.verify], ["応用力", r.ouyo]
+  ];
+  const numDims = dims.filter(function (d) { return typeof d[1] === "number"; });
+  const stages = [["段階1", r.a1], ["段階2", r.a2], ["段階3", r.a3]];
+  const numStages = stages.filter(function (s) { return typeof s[1] === "number"; });
+
+  /* 落ち方の型の判定（上から順に、最初に当たったものを採用） */
+  let ochi = null;
+  if (numDims.length >= 3) {
+    const vals = numDims.map(function (d) { return d[1]; });
+    const mx = Math.max.apply(null, vals), mn = Math.min.apply(null, vals);
+    const ouyoN = typeof r.ouyo === "number" ? r.ouyo : null;
+    if (numStages.length === 3 && r.a1 >= r.a2 && r.a2 >= r.a3 && r.a1 - r.a3 >= 15) {
+      ochi = { name: "段階逓減", text: "段階が進むにつれて、検出の数字が下がっていく並びです" };
+    } else if (typeof r.struct === "number" && r.struct >= BOUNDARY &&
+               ((typeof r.a === "number" && r.a < BOUNDARY) || (typeof r.b === "number" && r.b < BOUNDARY))) {
+      ochi = { name: "AI絡み落差", text: "自分の頭で考える力は高いのに、AIが絡む場面で数字が落ちています" };
+    } else if (ouyoN !== null && typeof r.a === "number" && typeof r.b === "number" &&
+               Math.abs((r.a + r.b) / 2 - ouyoN) >= 30) {
+      ochi = { name: "非対称", text: "自分で確かめる力と、AIに解かせる力の間に大きな落差があります" };
+    } else if (vals.every(function (v) { return v >= BOUNDARY; }) && mx - mn <= 25) {
+      ochi = { name: "安定高位", text: "どの数字も高いところでそろっています" };
+    } else if (vals.every(function (v) { return v < 40; })) {
+      if (unknownCount >= 3) {
+        ochi = { name: "全体低位（保留型）", text: "全体に数字が低く出ています。ただし、保留した問題は、解けなかったのではなく、決めなかったものです。この数字は、保留した分の低さを含んでいます" };
+      } else {
+        ochi = { name: "全体低位", text: "全体に数字が低く出ています" };
+      }
+    } else if (mx - mn >= 40 ||
+               (numStages.length === 3 && Math.max(r.a1, r.a2, r.a3) - Math.min(r.a1, r.a2, r.a3) >= 40)) {
+      ochi = { name: "ムラ", text: "数字のばらつきが大きく、場面によって出方が変わる並びです" };
+    }
+  }
+
+  /* 1行目：タイプ名＋落ち方の型 */
+  if (type) {
+    let l1 = "あなたのタイプは「" + type.name + "（" + type.short + "）」です。";
+    if (ochi) l1 += "数字の並びは「" + ochi.name + "」で、" + ochi.text + "。";
+    else if (numDims.length >= 3) l1 += "数字の並びに、極端な偏りはありません。";
+    else l1 += "測れた数字が一部だけのため、並びの型はまだ判定していません。";
+    lines.push(l1);
+  } else {
+    let l1 = "今回は、タイプ判定を保留しています。";
+    if (ochi) l1 += "ただし、測れた数字の並びは「" + ochi.name + "」で、" + ochi.text + "。";
+    else l1 += "測れた数字の範囲で、読み取れることをお伝えします。";
+    lines.push(l1);
+  }
+
+  /* 対象外の次元がある分岐では、その旨と「何が未知数か」をここで宣言する（型v0 §3.1 第1節の規則） */
+  if (type === TYPES.korekara) {
+    lines.push("AI活用力と応用力は、AIをまだ使っていないため未知数です。今回の数字は、構造化思考と、実演A・実演Bの結果です。");
+  } else if (type === TYPES.jiriki) {
+    lines.push("応用力（実演C）は自力部門のため対象外です。AI活用力の数字は、AIを使わずに解いた結果としての参考値です。");
+  }
+
+  /* スコアを文章で：5次元の列挙（数値は本人の実数）＋最高・最低 */
+  if (numDims.length > 0) {
+    const listed = dims.map(function (d) {
+      return d[0] + "は" + (typeof d[1] === "number" ? d[1] + "点" : (d[1] === "na" ? "対象外" : "未挑戦"));
+    });
+    lines.push("5つの数字は、" + listed.join("、") + "です。");
+    if (numDims.length >= 2) {
+      const sorted = numDims.slice().sort(function (x, y) { return y[1] - x[1]; });
+      const hi = sorted[0], lo = sorted[sorted.length - 1];
+      if (hi[1] > lo[1]) {
+        lines.push("最も高いのは" + hi[0] + "の" + hi[1] + "点、最も低いのは" + lo[0] + "の" + lo[1] + "点で、落差は" + (hi[1] - lo[1]) + "点あります。");
+      } else {
+        lines.push("測れた数字は、すべて" + hi[1] + "点でそろっています。");
+      }
+    }
+  }
+
+  /* 実演Aの段階別の流れ */
+  if (numStages.length === 3) {
+    lines.push("実演Aの中では、段階1が" + r.a1 + "点、段階2が" + r.a2 + "点、段階3が" + r.a3 + "点でした。");
+  } else if (numStages.length > 0) {
+    lines.push("実演Aは、" + numStages.map(function (s) { return s[0] + "が" + s[1] + "点"; }).join("、") + "でした（残りの段階は未挑戦です）。");
+  }
+
+  /* 検証力の判定語 */
+  if (typeof r.verify === "number") {
+    lines.push("検証力は" + r.verify + "点で、判定は「" + verifyWord(r.verify).word + "」です。");
+  }
+
+  /* 具体的な指摘を1つ（本人が実際に触れた＝見逃した・反応した項目だけ。対策は書かない。
+     優先順位は結果画面の「危なさの指摘」（buildWarnings）と同じ） */
+  let point = null;
+  if (bRes && !state.b.has(B_FATAL)) {
+    point = "実演Bでは、家族の住所・電話番号・生年月日を、外部のカレンダーサービスへ自動で送る設定を見逃しました。このテストで最も重い見逃しです。";
+  } else if (bRes && bRes.missed.length > 0) {
+    point = "実演Bでは、危ない設定を" + bRes.missed.length + "件見逃しました（" + bRes.missed.map(function (n) { return "L" + n; }).join("・") + "）。";
+  } else if (s3 && A_STAGES[3].scoredErrs.length - s3.hits > 0) {
+    point = "実演Aの段階3（作り話の検出）では、確かめるべき箇所を" + (A_STAGES[3].scoredErrs.length - s3.hits) + "件見逃しました。";
+  } else if (s2 && A_STAGES[2].scoredErrs.length - s2.hits > 0) {
+    point = "実演Aの段階2（文章の中の食い違い）では、検出は" + s2.hits + "／" + A_STAGES[2].scoredErrs.length + "件でした。";
+  } else if (s1 && A_STAGES[1].scoredErrs.length - s1.hits > 0) {
+    point = "実演Aの段階1（見ればわかる誤り）では、検出は" + s1.hits + "／" + A_STAGES[1].scoredErrs.length + "件でした。";
+  } else if (trap === 2) {
+    point = "第3部では、あなたのAIが、画面には表示されない指示に反応して、元の文章にない内容を混ぜて返しました。";
+  }
+  if (point) lines.push(point);
+  else if (numDims.length > 0) lines.push("今回の素材では、目立った見逃しはありませんでした。");
+
+  lines.push("この先は詳細レポートで読み解きます。");
+  return lines;
+}
+
 function renderResult() {
   const s1 = scoreStage(1), s2 = scoreStage(2), s3 = scoreStage(3);
   const structScore = wavg([[scoreStruct1(), 1], [scoreStruct2(), 1]]);
@@ -1631,6 +1757,13 @@ function renderResult() {
       const p = document.createElement("p"); p.textContent = t; wbox.appendChild(p);
     });
   }
+
+  /* 詳細レポートの冒頭プレビュー（本人のデータから組み立てる。採点・結果コードには影響しない） */
+  const pv = document.getElementById("report-preview");
+  pv.innerHTML = "";
+  buildReportPreview(r, type, trap, bRes, s1, s2, s3, unknowns.length).forEach(function (t) {
+    const p = document.createElement("p"); p.textContent = t; pv.appendChild(p);
+  });
 
   document.getElementById("result-code").textContent = makeResultCode(r, typeId, trap);
   document.getElementById("copy-note").textContent = "";
