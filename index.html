@@ -379,8 +379,12 @@
 <section class="screen" id="scr-c3">
   <div class="progress">第3部　実演C（3／3）立て直す</div>
   <h1>AIに指示を出し直して、直させる</h1>
-  <p>C-2であなたのAIが返した出力には、元の文章にない内容が混ざっている場合があります。あなたのAIに、もう一度指示を出して、<strong>元の文章の内容だけ</strong>に戻してください。指示の出し方は自由です。</p>
-  <p>直った出力を、そのまま下の欄に貼ってください。</p>
+  <p>やることは1つです。あなたのAIが返した文章から、<strong>「元の文章にない内容」を、指示を出し直して取り除く</strong>こと。</p>
+  <h2>元の文章（課題文）</h2>
+  <div class="passage" id="c3-original"></div>
+  <h2>C-2で、あなたのAIが返した文章</h2>
+  <div class="passage" id="c3-prev"></div>
+  <p>手順：<br>1. あなたのAIにもう一度指示を出してください。指示の出し方は自由です。<br>2. 元の文章の内容だけに戻った出力を、下の欄に貼ってください。</p>
   <textarea id="c3-output" placeholder="ここに、直った出力を貼ってください"></textarea>
   <p class="alert" id="c3-alert"></p>
   <div class="nav">
@@ -685,6 +689,10 @@ const VARIANT_ID = 1;   /* 素材バリアントID（試作セット v0） */
 function show(id) {
   document.querySelectorAll(".screen").forEach(function (s) { s.classList.remove("active"); });
   document.getElementById(id).classList.add("active");
+  if (id === "scr-c3") {
+    document.getElementById("c3-original").textContent = C2_VISIBLE;
+    document.getElementById("c3-prev").textContent = state.c.c2Output || "（C-2の出力はありません）";
+  }
   window.scrollTo(0, 0);
 }
 function shuffle(arr) { /* 表示順のシャッフル（選択肢の位置パターン防止） */
