@@ -169,6 +169,7 @@
   <p>所要時間は15分ほどです。最初に3つの質問（問診）に答え、そのあと第1部（構造化思考）、第2部（実演A・実演B）、第3部（実演C）に進みます。最後に結果と結果コードが表示されます。</p>
   <p><strong>第3部では、あなたが普段使っているAIを、別のタブ・別のアプリ・別の端末で開いて使います。AIを使っていない方・このテストにAIを使わない方は、第3部は対象外になります。</strong></p>
   <p>各設問には「わからない」という選択肢があります。分からないときは、無理に答えず「わからない」を選んでください。「わからない」を選んだ設問は0点にはならず、「未挑戦」として記録されます。</p>
+  <p><strong>このテストでは、前の画面に戻ることはできません。</strong>ブラウザの「戻る」ボタンでも前の問題には戻りません。再読み込みすると、最初からやり直しになります。1問ずつ、確かめてから進んでください。</p>
   <p class="note">このテストは、IQや知能を測る検査ではありません。結果は自己理解のための目安です。</p>
   <div class="nav"><button class="btn" id="btn-start">始める</button></div>
   <details>
@@ -431,6 +432,7 @@
   </table>
   <p class="note" id="result-axis-note"></p>
   <p class="note" id="result-unknown-note"></p>
+  <p class="note">スコアの境目（タイプ判定の線）は、試作段階の<strong>暫定の基準</strong>です。パイロットの結果を見て調整します。</p>
 
   <h2>検証力の判定</h2>
   <p id="result-verify-line">あなたの検証力は「<strong id="result-verify-word"></strong>」です。<span id="result-verify-desc"></span></p>
@@ -451,10 +453,22 @@
   <div class="nav"><a class="btn" href="https://docs.google.com/forms/d/e/1FAIpQLSeekhG8fcd8pHd8vsFVb_y8s0sf9fsOVRT_1XR_UQ417fLNpA/viewform" target="_blank" rel="noopener">結果コードと感想を送る（試作へのご協力）</a></div>
   <p class="note">送り先はGoogleフォームです。結果コードと任意の感想だけを集めます。氏名・メールアドレスは集めません。</p>
 
+  <h2>詳細レポート（有料）</h2>
+  <p>あなたの回答に沿って解説するレポートを用意しています。判定と危なさの指摘は無料のままです。レポートでは、その理由と対策を説明します。</p>
+  <p>詳細レポート（¥100・税込）：6つの節で、あなたの点数と回答をもとに解説します。<br>
+  より詳細レポート（¥999・税込）：10の節で、より深く分析します。受注生産のため、お渡しまで5営業日以内をいただきます。</p>
+  <div class="nav"><a class="btn" href="https://buy.stripe.com/8x2bJ0aqq2Fd1U52KTcEw00" target="_blank" rel="noopener">詳細レポート ¥100 を購入する</a></div>
+  <div class="nav"><a class="btn secondary" href="https://buy.stripe.com/3cIaEWeGGbbJcyJgBJcEw01" target="_blank" rel="noopener">より詳細レポート ¥999 を購入する</a></div>
+  <p class="note">購入の画面で、結果コードの入力が必要です。レポートは、入力された結果コードをもとに作成し、順次お渡しします。販売条件は<a href="tokushoho.html">特定商取引法に基づく表記</a>をご覧ください。</p>
+
+  <h2>戻りたかった所（任意）</h2>
+  <p class="note">このテストは前の画面に戻れません。途中で「戻りたかった」と思った所があれば、今後の改修の材料にします。ここに書いた内容は送信されません。よければ、上のフォームの感想欄に写して送ってください。</p>
+  <textarea id="wentback-note" rows="3" placeholder="例：第2部の途中で、前の問題を確かめたくなった"></textarea>
+
   <p class="note">このテストは、IQや知能を測る検査ではありません。結果は自己理解のための目安としてご覧ください。結果コードのチェックサムは入力ミスの検出用で、証明書としての効力はありません。</p>
 </section>
 
-<footer class="site">地頭テスト（試作版）　Never stop thinking, human</footer>
+<footer class="site">地頭テスト（試作版）　Never stop thinking, human　／　<a href="tokushoho.html">特定商取引法に基づく表記</a></footer>
 </div>
 
 <script>
@@ -694,6 +708,7 @@ const VERIFY_WORDS = [
 ];
 const BOUNDARY = 60;    /* 高／低の境目（仮置き。試作データで確定＝W1） */
 const VARIANT_ID = 1;   /* 素材バリアントID（試作セット v0） */
+const CRITERIA_VERSION = 1;   /* 判定基準のバージョン（較正で境目を動かすたびに上げる） */
 </script>
 
 <script>
@@ -745,7 +760,10 @@ document.querySelectorAll("#scr-intake .choices button").forEach(function (btn) 
     btn.classList.add("selected");
   });
 });
-document.getElementById("btn-start").addEventListener("click", function () { show("scr-intake"); });
+document.getElementById("btn-start").addEventListener("click", function () {
+  if (!window.confirm("このテストでは、前の画面に戻ることはできません。このまま始めますか？")) return;
+  show("scr-intake");
+});
 document.getElementById("btn-intake-next").addEventListener("click", function () {
   if (!state.q1 || !state.q2 || !state.q3) {
     document.getElementById("intake-alert").textContent = "Q1〜Q3のすべてに答えてください。";
@@ -1279,8 +1297,9 @@ function scoreOuyo() { /* 応用力。対象外の分岐では "na"、全て未�
    - C-2の署名判定（0＝対象外・未実施／1＝署名なし／2＝署名あり）を追加した。
    - 未挑戦（「わからない」）の次元・段階は、値 255 で記録し、0点と区別する。
    - タイプIDに 6＝「判定保留（未挑戦の部があり軸がそろわない）」を追加した。
+   v3（2026-11-26夜）：判定基準のバージョン（CRITERIA_VERSION）を追加した。デコーダは v2／v3 の両方を読む。
    並び：バージョン／受験日時／問診Q1〜Q3／次元スコア5つ（構造化思考・実演A・実演B・検証力・応用力）／
-   実演A段階別スコア／タイプID／素材バリアントID／疑いフラグ／署名判定／ノンス／チェックサム を Base32 化する。
+   実演A段階別スコア／タイプID／素材バリアントID／疑いフラグ／署名判定／基準バージョン（v3のみ）／ノンス／チェックサム を Base32 化する。
    個人情報・自由記述は入れない。AI丸投げ疑いフラグ（R6）の欄はコード内にだけ持つが、
    試作では検出ロジック未実装のため常に0とする。旧バージョン（v1）のコードとは互換性がない。 */
 const B32 = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
@@ -1310,10 +1329,11 @@ document.getElementById("btn-decode").addEventListener("click", function () {
   const box = document.getElementById("decode-result");
   const bytes = base32Decode(document.getElementById("decode-input").value);
   function fail(msg) { box.innerHTML = ""; const p = document.createElement("p"); p.className = "alert"; p.textContent = msg; box.appendChild(p); }
-  if (bytes.length < 27) { fail("コードが短すぎます。結果コードをそのまま貼ってください。"); return; }
-  if (bytes[0] !== 2) { fail("このバージョンのコードには対応していません。"); return; }
-  let sum = 0; for (let i = 0; i < 26; i++) sum += bytes[i];
-  if (sum % 251 !== bytes[26]) { fail("コードのチェックサムが合いません。貼り間違いがないか確かめてください。"); return; }
+  if (bytes[0] !== 2 && bytes[0] !== 3) { fail("このバージョンのコードには対応していません。"); return; }
+  const ckIdx = bytes[0] === 3 ? 27 : 26;
+  if (bytes.length < ckIdx + 1) { fail("コードが短すぎます。結果コードをそのまま貼ってください。"); return; }
+  let sum = 0; for (let i = 0; i < ckIdx; i++) sum += bytes[i];
+  if (sum % 251 !== bytes[ckIdx]) { fail("コードのチェックサムが合いません。貼り間違いがないか確かめてください。"); return; }
   function sc(v) { return v === 255 ? "未挑戦・対象外" : v + " 点"; }
   const rows = [
     ["受けた日時", (2026 + bytes[1]) + "年" + bytes[2] + "月" + bytes[3] + "日 " + bytes[4] + "時" + ("0" + bytes[5]).slice(-2) + "分"],
@@ -1323,7 +1343,8 @@ document.getElementById("btn-decode").addEventListener("click", function () {
     ["検証力", sc(bytes[12])],
     ["応用力（実演C）", sc(bytes[13])],
     ["タイプ", TYPE_NAMES_BY_ID[bytes[17]] || "不明"],
-    ["第3部の記録", TRAP_LABELS[bytes[20]] || "不明"]
+    ["第3部の記録", TRAP_LABELS[bytes[20]] || "不明"],
+    ["判定基準のバージョン", bytes[0] === 3 ? ("v" + bytes[21] + "（暫定）") : "記録なし（旧形式）"]
   ];
   box.innerHTML = "";
   const t = document.createElement("table"); t.className = "scores";
@@ -1338,14 +1359,15 @@ document.getElementById("btn-decode").addEventListener("click", function () {
 function makeResultCode(r, typeId, trap) {
   const now = new Date();
   const bytes = [
-    2, /* バージョン（v2） */
+    3, /* バージョン（v3：基準バージョンを追加） */
     now.getFullYear() - 2026, now.getMonth() + 1, now.getDate(), now.getHours(), now.getMinutes(),
     state.q1 === "yes" ? 1 : 0, state.q2 === "yes" ? 1 : 0, parseInt(state.q3, 10),
     encScore(r.struct), encScore(r.a), encScore(r.b), encScore(r.verify), encScore(r.ouyo),
     encScore(r.a1), encScore(r.a2), encScore(r.a3),
     typeId, VARIANT_ID,
     0, /* 疑いフラグ（R6）：試作では未実装のため常に0 */
-    trap
+    trap,
+    CRITERIA_VERSION
   ];
   for (let i = 0; i < 5; i++) bytes.push(Math.floor(Math.random() * 256)); /* ノンス（コードの重複防止） */
   let sum = 0; bytes.forEach(function (b) { sum += b; });
