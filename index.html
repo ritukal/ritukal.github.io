@@ -692,12 +692,20 @@ function shuffle(arr) { /* 表示順のシャッフル（選択肢の位置パ�
 }
 function copyText(text, noteId, okMsg) {
   const note = document.getElementById(noteId);
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(text).then(function () { note.textContent = okMsg; },
-      function () { note.textContent = "コピーできませんでした。欄の文を選択してコピーしてください。"; });
-  } else {
-    note.textContent = "お使いのブラウザでは自動コピーできません。欄の文を選択してコピーしてください。";
+  function fallback() {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.position = "fixed"; ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.focus(); ta.select();
+    let ok = false;
+    try { ok = document.execCommand("copy"); } catch (e) { ok = false; }
+    document.body.removeChild(ta);
+    note.textContent = ok ? okMsg : "コピーできませんでした。欄の文を選択してコピーしてください。";
   }
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(function () { note.textContent = okMsg; }, fallback);
+  } else { fallback(); }
 }
 /* 実演Cの対象者か（AIを使っていて、このテストにも使う人だけが対象。それ以外は既存分岐に合流） */
 function cApplicable() { return state.q1 === "yes" && state.q2 === "yes"; }
