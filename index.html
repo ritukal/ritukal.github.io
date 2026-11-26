@@ -649,12 +649,12 @@ const C1B_ITEMS = [
   { text: "AIへのお礼の言葉", correct: false }
 ];
 const C3_QUESTION = {
-  label: "出力を直すための再指示として、最も適切なものはどれですか。",
+  label: "出力を直すための再指示・直し方として、適切だと思うものをすべて選んでください。（複数選択）",
   choices: ["間違っている箇所（元の文章にない文）を具体的に指摘して、元の文章の内容だけに戻すよう指示する",
             "もう一度、まったく同じ指示を送る",
             "別のAIに、同じ課題を丸ごと投げ直す",
             "出力のうち使える部分だけを抜き出して、自分でつなぎ合わせる"],
-  correct: 0
+  correctSet: [0, 3]
 };
 
 /* --- タイプ（設計書 §6 で確定した正式名＋仮置きの略称） --- */
@@ -1082,14 +1082,17 @@ document.getElementById("btn-c3-unknown").addEventListener("click", function () 
   const h = document.createElement("h2"); h.textContent = C3_QUESTION.label;
   body.appendChild(h);
   const ul = document.createElement("ul"); ul.className = "choices";
+  if (!Array.isArray(state.c.c3q)) state.c.c3q = [];
   shuffle(C3_QUESTION.choices.map(function (_, i) { return i; })).forEach(function (ci) {
     const li = document.createElement("li");
     const btn = document.createElement("button");
     btn.textContent = C3_QUESTION.choices[ci];
     btn.addEventListener("click", function () {
-      state.c.c3q = ci; state.c.c3qSkip = false;
-      ul.querySelectorAll("button").forEach(function (b) { b.classList.remove("selected"); });
-      btn.classList.add("selected");
+      state.c.c3qSkip = false;
+      btnU.classList.remove("selected");
+      const k = state.c.c3q.indexOf(ci);
+      if (k >= 0) { state.c.c3q.splice(k, 1); btn.classList.remove("selected"); }
+      else { state.c.c3q.push(ci); btn.classList.add("selected"); }
     });
     li.appendChild(btn); ul.appendChild(li);
   });
@@ -1097,7 +1100,7 @@ document.getElementById("btn-c3-unknown").addEventListener("click", function () 
   const btnU = document.createElement("button");
   btnU.textContent = "わからない";
   btnU.addEventListener("click", function () {
-    state.c.c3q = undefined; state.c.c3qSkip = true;
+    state.c.c3q = []; state.c.c3qSkip = true;
     ul.querySelectorAll("button").forEach(function (b) { b.classList.remove("selected"); });
     btnU.classList.add("selected");
   });
@@ -1105,8 +1108,8 @@ document.getElementById("btn-c3-unknown").addEventListener("click", function () 
   body.appendChild(ul);
 })();
 document.getElementById("btn-c3q-next").addEventListener("click", function () {
-  if (state.c.c3q === undefined && !state.c.c3qSkip) {
-    document.getElementById("c3q-alert").textContent = "1つ選んでください（分からない場合は「わからない」で構いません）。";
+  if ((!state.c.c3q || state.c.c3q.length === 0) && !state.c.c3qSkip) {
+    document.getElementById("c3q-alert").textContent = "1つ以上選んでください（分からない場合は「わからない」で構いません）。";
     return;
   }
   renderResult();
@@ -1239,7 +1242,11 @@ function checkC3Output(text) { /* 署名が消えているか／元の内容（�
 function scoreC3() {
   const parts = [];
   if (!state.c.c3Skip && state.c.c3Output.trim()) parts.push(checkC3Output(state.c.c3Output).passed / 2 * 100);
-  if (!state.c.c3qSkip && state.c.c3q !== undefined) parts.push(state.c.c3q === C3_QUESTION.correct ? 100 : 0);
+  if (!state.c.c3qSkip && state.c.c3q && state.c.c3q.length) {
+    const good = C3_QUESTION.correctSet.filter(function (i) { return state.c.c3q.indexOf(i) >= 0; }).length;
+    const bad = state.c.c3q.filter(function (i) { return C3_QUESTION.correctSet.indexOf(i) < 0; }).length;
+    parts.push(Math.max(0, (good - bad) / C3_QUESTION.correctSet.length) * 100);
+  }
   if (parts.length === 0) return null;
   return Math.round(parts.reduce(function (a, b) { return a + b; }, 0) / parts.length);
 }
