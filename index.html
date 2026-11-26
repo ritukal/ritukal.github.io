@@ -353,7 +353,10 @@
 <section class="screen" id="scr-c2mark">
   <div class="progress">第3部　実演C（2／3）出力を確かめる</div>
   <h1>おかしい箇所に印を付ける</h1>
-  <p>あなたのAIが返した文章です。元の文章（課題文）と比べて、「元の文章にない内容」「おかしい」と思う箇所に、すべて印を付けてください。</p>
+  <p>下に、元の文章（課題文）と、あなたのAIが返した文章の両方を表示しています。見比べて、「元の文章にない内容」「おかしい」と思う箇所に、すべて印を付けてください。</p>
+  <h2>元の文章（課題文）</h2>
+  <div class="passage" id="c2-original"></div>
+  <h2>あなたのAIが返した文章</h2>
   <div class="passage" id="c2-passage"></div>
   <p class="note">印を付けたい箇所をタップ／クリックしてください。もう一度押すと印が外れます。</p>
   <div class="nav">
@@ -982,6 +985,7 @@ document.getElementById("btn-c2-next").addEventListener("click", function () {
   state.c.c2Output = v;
   state.c.c2Segments = splitSegments(v);
   state.c.c2Marks = new Set();
+  document.getElementById("c2-original").textContent = C2_VISIBLE;
   const box = document.getElementById("c2-passage");
   box.innerHTML = "";
   state.c.c2Segments.forEach(function (segText, i) {
