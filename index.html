@@ -1542,7 +1542,10 @@ function unknownLabels() { /* 「わからない」を選んだ設問の一覧�
 }
 /* ================= 詳細レポートの冒頭プレビュー =================
    結果画面の「詳細レポート（有料）」節で、本人のデータからその場で組み立てる冒頭文。
-   範囲はレポート第1節（結果の読み方）相当まで＋本人が触れた項目への指摘1つ。
+   構成：タイプ名＋落ち方の型の解釈（1行）／分岐の宣言（該当時のみ）／指摘（1つ全文＋材料があれば、もう1つは見出しだけ）／
+   本人の弱点・落差に紐づく「問い」2〜3個（見出しのみ。答えは書かない）／締めの一文。
+   スコアの列挙はしない（結果画面にスコア表示があるため）。数値への言及は、落差など解釈に必要な最小限のみ。
+   落ち方の型の説明は理由に入る手前で止め、プレビュー全体も問いで開いたままにする（要約で閉じない）。
    対策（第4節）と指示の型（第5節）は含めない。採点・結果コードには一切関与しない。
    落ち方の型は、型v0 §2 軸5の6型（＋v0.1パッチの「全体低位（保留型）」）を、画面内の実データから決定的に判定する。
    数値次元が3未満しか測れていない分岐では、型を名乗らず、言える範囲だけを書く。 */
@@ -1554,6 +1557,13 @@ function buildReportPreview(r, type, trap, bRes, s1, s2, s3, unknownCount) {
   const numDims = dims.filter(function (d) { return typeof d[1] === "number"; });
   const stages = [["段階1", r.a1], ["段階2", r.a2], ["段階3", r.a3]];
   const numStages = stages.filter(function (s) { return typeof s[1] === "number"; });
+  const stageDefs = [null, s1, s2, s3];
+  const stageMiss = [0,
+    s1 ? A_STAGES[1].scoredErrs.length - s1.hits : 0,
+    s2 ? A_STAGES[2].scoredErrs.length - s2.hits : 0,
+    s3 ? A_STAGES[3].scoredErrs.length - s3.hits : 0];
+  const fatalMissed = !!(bRes && !state.b.has(B_FATAL));
+  const bOthers = bRes ? bRes.missed.filter(function (n) { return n !== B_FATAL; }) : [];
 
   /* 落ち方の型の判定（上から順に、最初に当たったものを採用） */
   let ochi = null;
@@ -1583,7 +1593,7 @@ function buildReportPreview(r, type, trap, bRes, s1, s2, s3, unknownCount) {
     }
   }
 
-  /* 1行目：タイプ名＋落ち方の型 */
+  /* 1行目：タイプ名＋落ち方の型（説明は理由に入る手前で止める） */
   if (type) {
     let l1 = "あなたのタイプは「" + type.name + "（" + type.short + "）」です。";
     if (ochi) l1 += "数字の並びは「" + ochi.name + "」で、" + ochi.text + "。";
@@ -1604,53 +1614,105 @@ function buildReportPreview(r, type, trap, bRes, s1, s2, s3, unknownCount) {
     lines.push("応用力（実演C）は自力部門のため対象外です。AI活用力の数字は、AIを使わずに解いた結果としての参考値です。");
   }
 
-  /* スコアを文章で：5次元の列挙（数値は本人の実数）＋最高・最低 */
-  if (numDims.length > 0) {
-    const listed = dims.map(function (d) {
-      return d[0] + "は" + (typeof d[1] === "number" ? d[1] + "点" : (d[1] === "na" ? "対象外" : "未挑戦"));
+  /* 指摘：本人が実際に触れた項目だけを材料に、優先順（結果画面の「危なさの指摘」と同じ）で並べる。
+     1つ目は全文、2つ目は見出しだけ。材料が1つ以下なら、見出しだけの指摘は作らない。対策は書かない。 */
+  const points = [];
+  if (fatalMissed) {
+    points.push({
+      full: "実演Bでは、家族の住所・電話番号・生年月日を、外部のカレンダーサービスへ自動で送る設定を見逃しました。このテストで最も重い見逃しです。",
+      head: "実演B：家族の情報を外部へ送る設定の見逃し"
     });
-    lines.push("5つの数字は、" + listed.join("、") + "です。");
-    if (numDims.length >= 2) {
-      const sorted = numDims.slice().sort(function (x, y) { return y[1] - x[1]; });
-      const hi = sorted[0], lo = sorted[sorted.length - 1];
-      if (hi[1] > lo[1]) {
-        lines.push("最も高いのは" + hi[0] + "の" + hi[1] + "点、最も低いのは" + lo[0] + "の" + lo[1] + "点で、落差は" + (hi[1] - lo[1]) + "点あります。");
-      } else {
-        lines.push("測れた数字は、すべて" + hi[1] + "点でそろっています。");
-      }
+  }
+  if (bOthers.length > 0) {
+    points.push({
+      full: "実演Bでは、危ない設定を" + bOthers.length + "件見逃しました（" + bOthers.map(function (n) { return "L" + n; }).join("・") + "）。",
+      head: "実演B：危ない設定の見逃し " + bOthers.length + "件"
+    });
+  }
+  if (stageMiss[3] > 0) {
+    points.push({
+      full: "実演Aの段階3（作り話の検出）では、確かめるべき箇所を" + stageMiss[3] + "件見逃しました。",
+      head: "実演A 段階3（作り話の検出）：確かめるべき箇所の見逃し"
+    });
+  }
+  if (stageMiss[2] > 0) {
+    points.push({
+      full: "実演Aの段階2（文章の中の食い違い）では、検出は" + s2.hits + "／" + A_STAGES[2].scoredErrs.length + "件でした。",
+      head: "実演A 段階2（文章の中の食い違い）：検出の届かなかった箇所"
+    });
+  }
+  if (stageMiss[1] > 0) {
+    points.push({
+      full: "実演Aの段階1（見ればわかる誤り）では、検出は" + s1.hits + "／" + A_STAGES[1].scoredErrs.length + "件でした。",
+      head: "実演A 段階1（見ればわかる誤り）：検出の届かなかった箇所"
+    });
+  }
+  if (trap === 2) {
+    points.push({
+      full: "第3部では、あなたのAIが、画面には表示されない指示に反応して、元の文章にない内容を混ぜて返しました。",
+      head: "第3部：AIが画面には表示されない指示に反応した記録"
+    });
+  }
+  if (points.length > 0) {
+    lines.push(points[0].full);
+    if (points.length > 1) lines.push("もう1つ：" + points[1].head + "。");
+  } else if (numDims.length > 0) {
+    lines.push("今回の素材では、目立った見逃しはありませんでした。");
+  }
+
+  /* 問い：本人の弱点・落差に紐づくものだけを見出しとして並べる（答えは書かない）。
+     該当しない問いは出さない。並びは弱点の重い順。最大3個。 */
+  const qs = [];
+  if (fatalMissed) {
+    qs.push("最も重い見逃しが、家族の情報を外部へ送る設定だったのはなぜか");
+  }
+  if (trap === 2) {
+    qs.push("あなたのAIが、画面には表示されない指示に反応してしまったのはなぜか");
+  }
+  if (ochi && ochi.name === "段階逓減") {
+    qs.push("段階が進むにつれて、検出が下がっていくのはなぜか");
+  } else {
+    let worst = 0;
+    for (let i = 1; i <= 3; i++) {
+      if (stageDefs[i] && stageMiss[i] > stageMiss[worst]) worst = i;
+    }
+    if (worst > 0) {
+      const theme = ["", "見ればわかる誤り", "文章の中の食い違い", "作り話の検出"][worst];
+      qs.push("なぜ段階" + worst + "（" + theme + "）で落としたのか");
     }
   }
-
-  /* 実演Aの段階別の流れ */
-  if (numStages.length === 3) {
-    lines.push("実演Aの中では、段階1が" + r.a1 + "点、段階2が" + r.a2 + "点、段階3が" + r.a3 + "点でした。");
-  } else if (numStages.length > 0) {
-    lines.push("実演Aは、" + numStages.map(function (s) { return s[0] + "が" + s[1] + "点"; }).join("、") + "でした（残りの段階は未挑戦です）。");
+  const verifySplit = typeof r.verify === "number" &&
+    ((bRes && bRes.missed.length > 0) || stageMiss[3] > 0) &&
+    ((s3 && s3.hits > 0) || (bRes && bRes.tp > 0));
+  if (verifySplit) {
+    qs.push("検証力が効いた場面と、効かなかった場面は、どこが違うのか");
   }
-
-  /* 検証力の判定語 */
-  if (typeof r.verify === "number") {
-    lines.push("検証力は" + r.verify + "点で、判定は「" + verifyWord(r.verify).word + "」です。");
+  if (numDims.length >= 2) {
+    const sortedQ = numDims.slice().sort(function (x, y) { return y[1] - x[1]; });
+    const hiQ = sortedQ[0], loQ = sortedQ[sortedQ.length - 1];
+    if (hiQ[1] - loQ[1] >= 25 && loQ[1] < BOUNDARY) {
+      qs.push(loQ[0] + "が他の数字と離れているのはなぜか");
+    }
   }
-
-  /* 具体的な指摘を1つ（本人が実際に触れた＝見逃した・反応した項目だけ。対策は書かない。
-     優先順位は結果画面の「危なさの指摘」（buildWarnings）と同じ） */
-  let point = null;
-  if (bRes && !state.b.has(B_FATAL)) {
-    point = "実演Bでは、家族の住所・電話番号・生年月日を、外部のカレンダーサービスへ自動で送る設定を見逃しました。このテストで最も重い見逃しです。";
-  } else if (bRes && bRes.missed.length > 0) {
-    point = "実演Bでは、危ない設定を" + bRes.missed.length + "件見逃しました（" + bRes.missed.map(function (n) { return "L" + n; }).join("・") + "）。";
-  } else if (s3 && A_STAGES[3].scoredErrs.length - s3.hits > 0) {
-    point = "実演Aの段階3（作り話の検出）では、確かめるべき箇所を" + (A_STAGES[3].scoredErrs.length - s3.hits) + "件見逃しました。";
-  } else if (s2 && A_STAGES[2].scoredErrs.length - s2.hits > 0) {
-    point = "実演Aの段階2（文章の中の食い違い）では、検出は" + s2.hits + "／" + A_STAGES[2].scoredErrs.length + "件でした。";
-  } else if (s1 && A_STAGES[1].scoredErrs.length - s1.hits > 0) {
-    point = "実演Aの段階1（見ればわかる誤り）では、検出は" + s1.hits + "／" + A_STAGES[1].scoredErrs.length + "件でした。";
-  } else if (trap === 2) {
-    point = "第3部では、あなたのAIが、画面には表示されない指示に反応して、元の文章にない内容を混ぜて返しました。";
+  if (unknownCount >= 3) {
+    qs.push("保留を選んだ問題と、選ばなかった問題の境目はどこか");
   }
-  if (point) lines.push(point);
-  else if (numDims.length > 0) lines.push("今回の素材では、目立った見逃しはありませんでした。");
+  if (qs.length === 0 && ochi) {
+    const oq = {
+      "AI絡み落差": "AIが絡む場面でだけ、数字が落ちるのはなぜか",
+      "非対称": "自分で確かめる力と、AIに解かせる力の落差は、どこから来るのか",
+      "全体低位": "数字が全体に低く出たのは、どの場面からか",
+      "全体低位（保留型）": "数字が全体に低く出たのは、どの場面からか",
+      "ムラ": "場面によって数字が大きく変わるのはなぜか",
+      "安定高位": "高い数字がそろっている並びが、崩れるとしたらどの場面か"
+    };
+    if (oq[ochi.name]) qs.push(oq[ochi.name]);
+  }
+  const shownQs = qs.slice(0, 3);
+  if (shownQs.length > 0) {
+    lines.push("詳細レポートでは、次の問いを読み解きます。");
+    shownQs.forEach(function (q) { lines.push("・" + q); });
+  }
 
   lines.push("この先は詳細レポートで読み解きます。");
   return lines;
